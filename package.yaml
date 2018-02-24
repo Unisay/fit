@@ -30,6 +30,9 @@ library:
   - brick
   - vty
   - microlens-platform
+  - vector
+  - text-zipper
+  - newtype
 
 executables:
   fit:

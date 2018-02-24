@@ -4,21 +4,21 @@ module Fit.State
   ( FitState(..)
   , focusRing
   , command
-  , cmdEdit
+  , suggestions
   ) where
 
-import           Lens.Micro.Platform
+import qualified Brick.Focus         as F
+import qualified Brick.Widgets.Edit  as E
+import qualified Brick.Widgets.List  as L
+import           Fit.Model
 import           Fit.Name
-import           Protolude
-
-import qualified Brick.Focus        as F
-import qualified Brick.Widgets.Edit as E
+import           Lens.Micro.Platform
 
 
 data FitState = FitState
-  { _focusRing :: F.FocusRing FitName
-  , _command   :: Maybe Text
-  , _cmdEdit   :: E.Editor Text FitName
+  { _focusRing   :: F.FocusRing FitName
+  , _command     :: E.Editor Command FitName
+  , _suggestions :: L.List FitName Suggestion
   }
 
 makeLenses ''FitState

@@ -4,6 +4,7 @@ module Fit.Name
 
 import Protolude
 
-data FitName =
-  CmdEdit
+data FitName
+  = CmdEdit
+  | SuggestionsList
   deriving (Eq, Ord, Show)
