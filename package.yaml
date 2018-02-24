@@ -1,0 +1,40 @@
+name:                fit
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/unisay/fit#readme
+license:             BSD3
+author:              Yuriy Lazaryev
+maintainer:          Yuriy dot Lazaryev at gmail dot com
+copyright:           2018 Yuriy Lazaryev
+category:            Productivity CLI
+extra-source-files:
+  - README.md
+
+ghc-options: -Wall
+
+default-extensions:
+  - NoImplicitPrelude
+  - OverloadedStrings
+
+dependencies:
+  - base >= 4.7 && < 5
+  - protolude
+  - text
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Fit.UI
+  dependencies:
+  - brick
+  - vty
+  - microlens-platform
+
+executables:
+  fit:
+    source-dirs:      main
+    main:             Main.hs
+    ghc-options:      -threaded
+    dependencies:
+    - fit
