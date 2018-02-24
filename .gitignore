@@ -1,0 +1,5 @@
+*.cabal
+*.iml
+.idea/
+.stack-work/
+out/
