@@ -1,10 +1,14 @@
 module Main where
 
-import Protolude
-import Fit.UI
 import qualified Data.Text as T
+import           Dhall
+import           Fit
+import           Protolude
 
 main :: IO ()
 main = do
   args <- getArgs
-  display $ head $ T.pack <$> args
+  cfg <- input auto "./data/config.dhall"
+  putText $ show cfg
+  let cmd = head $ T.pack <$> args
+  display (cfg :: FitConfig) cmd

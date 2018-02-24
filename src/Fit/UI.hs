@@ -13,9 +13,10 @@ import qualified Brick.Widgets.Border.Style as S
 import qualified Brick.Widgets.Center       as C
 import qualified Brick.Widgets.Edit         as E
 import qualified Brick.Widgets.List         as L
-import qualified Control.Newtype            as NT
+import           Control.Newtype
 import qualified Data.Text                  as T
 import qualified Data.Vector                as Vec
+import           Fit.Config
 import           Fit.Model
 import           Fit.Name
 import           Fit.State
@@ -24,19 +25,19 @@ import           Graphics.Vty.Attributes
 import           Lens.Micro.Platform
 import           Protolude                  hiding (on)
 
-display :: Maybe Text -> IO ()
-display c = void $ defaultMain app (initialState c)
+display :: FitConfig -> Maybe Text -> IO ()
+display cfg cmd = void $ defaultMain app $ initialState cfg cmd
 
 type FitEvent = ()
 
-initialState :: Maybe Text -> FitState
-initialState mbCommand =
+initialState :: FitConfig -> Maybe Text -> FitState
+initialState config mbCommand =
   FitState { _focusRing = F.focusRing [CmdEdit, SuggestionsList]
            , _command = E.editor CmdEdit Nothing cmd
            , _suggestions = L.list SuggestionsList (Vec.fromList ss) 1
            }
   where
-    ss = suggest cmd
+    ss = suggestCommand config cmd
     cmd = Command $ fromMaybe "" mbCommand
 
 
@@ -55,23 +56,23 @@ drawUi s = [ui s]
 
 attributes :: AttrMap
 attributes = A.attrMap V.defAttr
-    [ ( E.editAttr,                   black `on` white )
+    [ ( E.editAttr,                   fg white         )
     , ( E.editFocusedAttr,            black `on` blue  )
     , ( L.listAttr,                   fg white         )
-    , ( L.listSelectedAttr,           fg yellow        )
+    , ( L.listSelectedAttr,           black `on` blue  )
     ]
 
 ui :: FitState -> Widget FitName
 ui st =
   withBorderStyle S.unicode $
-  B.borderWithLabel (str "Forget it!") $
+  B.borderWithLabel (txt "| Forget it! |") $
     (str "Command: " <+> vLimit 1 (commandEditor st)) <=>
     suggestionsList st
 
 commandEditor :: FitState -> Widget FitName
 commandEditor st = F.withFocusRing
   (st ^. focusRing)
-  (E.renderEditor (txt . T.unlines . fmap NT.unpack))
+  (E.renderEditor (txt . T.unlines . fmap unpack))
   (st ^. command)
 
 suggestionsList :: FitState -> Widget FitName
@@ -81,12 +82,11 @@ suggestionsList st = F.withFocusRing
   (st ^. suggestions)
 
 renderSuggestion :: Bool -> Suggestion -> Widget FitName
-renderSuggestion sel a =
-  let selStr s =
-        if sel
-          then txt $ "-> " <> s
-          else txt s
-  in C.hCenter $ selStr (show a)
+renderSuggestion isActive (Suggestion s) =
+  C.hCenter $ item s
+  where
+    item = txt . bool identity active isActive
+    active i = "-> " <> i <> " <-"
 
 handleEvent :: FitState -> BrickEvent FitName FitEvent -> EventM FitName (Next FitState)
 handleEvent st (VtyEvent ev) =

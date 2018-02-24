@@ -4,12 +4,13 @@
 module Fit.Model
   ( Command(..)
   , Suggestion(..)
-  , suggest
+  , suggestCommand
   ) where
 
-import           Brick.Widgets.Core (TextWidth)
+import           Brick.Widgets.Core       (TextWidth)
 import           Control.Newtype
 import           Data.Text.Zipper.Generic
+import           Fit.Config
 import           Protolude
 
 newtype Command =
@@ -25,5 +26,6 @@ newtype Suggestion =
   Suggestion Text
   deriving (Eq, Show)
 
-suggest :: Command -> [Suggestion]
-suggest = const $ Suggestion <$> ["Foo", "Bar", "Baz"]
+suggestCommand :: FitConfig -> Command -> [Suggestion]
+suggestCommand (FitConfig commands) = const $ suggest <$> commands where
+  suggest (CommandConfig name desc) = Suggestion $ name <> " - " <> desc

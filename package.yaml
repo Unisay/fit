@@ -20,12 +20,13 @@ default-extensions:
 dependencies:
   - base >= 4.7 && < 5
   - protolude
+  - dhall
   - text
 
 library:
   source-dirs: src
   exposed-modules:
-  - Fit.UI
+  - Fit
   dependencies:
   - brick
   - vty
