@@ -1,39 +1,90 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Fit.Model
-  ( Command(..)
+  ( CommandLine(..)
+  , Command(..)
   , Suggestion(..)
-  , Name(..)
   , Description(..)
+  , Named
+  , name
   , suggestCommand
+  , command
+  , subCommand
+  , flags
+  , emptyCommandLine
   ) where
 
-import           Brick.Widgets.Core       (TextWidth)
-import           Control.Newtype
-import           Data.Text.Zipper.Generic
-import           Fit.Config
-import           Protolude
+import Brick.Widgets.Core (TextWidth)
+import Control.Newtype
+import Data.Text.Zipper.Generic
+import Fit.Config
+import Lens.Micro.Platform
+import Protolude
 
-newtype Command = Command Text
+type Name = Text
+
+class Named a  where
+  name :: a -> Text
+
+newtype Command =
+  Command Name
   deriving (Eq, Show, Monoid, GenericTextZipper, TextWidth)
 
 instance Newtype Command Text where
   pack = Command
   unpack (Command t) = t
 
-newtype Name = Name Text
+instance Named Command where
+  name (Command n) = n
+
+data Flag =
+  Flag Name
+       Description
   deriving (Eq, Show)
 
-newtype Description = Description Text
+instance Named Flag where
+  name (Flag n _) = n
+
+data SubCommand =
+  SubCommand Name
+             Description
   deriving (Eq, Show)
 
-data Suggestion = Suggestion Name Description
+instance Named SubCommand where
+  name (SubCommand n _) = n
+
+newtype Description =
+  Description Text
   deriving (Eq, Show)
 
-suggestCommand :: FitConfig -> Command -> [Suggestion]
-suggestCommand (FitConfig commands) _ =
-  suggest <$> commands
+data Suggestion e = Suggestion
+  { suggested :: e
+  , description :: Description
+  } deriving (Eq, Show)
+
+instance Named e =>
+         Named (Suggestion e) where
+  name (Suggestion e _) = name e
+
+suggestCommand :: FitConfig -> Command -> [Suggestion Command]
+suggestCommand (FitConfig commands) _ = suggest <$> commands
   where
-    suggest (CommandConfig name desc) =
-      Suggestion (Name name) (Description desc)
+    suggest (CommandConfig nm ds) = Suggestion (Command nm) (Description ds)
+
+data CommandLine = CommandLine
+  { _command :: Maybe Command
+  , _subCommand :: Maybe SubCommand
+  , _flags :: [Flag]
+  } deriving (Show, Eq)
+
+emptyCommandLine :: CommandLine
+emptyCommandLine =
+  CommandLine
+  { _command = Nothing
+  , _subCommand = Nothing
+  , _flags = []
+  }
+
+makeLenses ''CommandLine
