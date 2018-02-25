@@ -3,14 +3,13 @@ module Fit.UI
   ) where
 
 import           Brick
-import qualified Brick.AttrMap              as A
 import qualified Brick.Focus                as F
 import qualified Brick.Main                 as M
+import           Brick.Themes               (Theme, loadCustomizations,
+                                             newTheme, themeToAttrMap)
 import           Brick.Types                (BrickEvent (..), handleEventLensed)
-import           Brick.Util                 (on)
 import qualified Brick.Widgets.Border       as B
 import qualified Brick.Widgets.Border.Style as S
-import qualified Brick.Widgets.Center       as C
 import qualified Brick.Widgets.Edit         as E
 import qualified Brick.Widgets.List         as L
 import           Control.Newtype
@@ -23,10 +22,37 @@ import           Fit.State
 import qualified Graphics.Vty               as V
 import           Graphics.Vty.Attributes
 import           Lens.Micro.Platform
-import           Protolude                  hiding (on)
+import           Protolude
 
 display :: FitConfig -> Maybe Text -> IO ()
-display cfg cmd = void $ defaultMain app $ initialState cfg cmd
+display cfg cmd = do
+  theme <- loadedTheme
+  void $ defaultMain (app theme) $ initialState cfg cmd
+
+loadedTheme :: IO Theme
+loadedTheme = do
+  let attrs = [ (E.editAttr,                  defAttr)
+              , (E.editFocusedAttr,           defAttr)
+              , (L.listAttr,                  defAttr)
+              , (L.listSelectedAttr,          defAttr)
+              , (suggestionAttr,              defAttr)
+              , (suggestionNameAttr,          defAttr)
+              , (suggestionDescAttr,          defAttr)
+              , (selected suggestionAttr,     styled standout)
+              , (selected suggestionNameAttr, styled standout)
+              , (selected suggestionDescAttr, styled standout)
+              ]
+  let defaultTheme = newTheme defAttr attrs
+  customizations <- loadCustomizations "theme.ini" defaultTheme
+  putErrLn (show customizations :: Text)
+  let fallback err = putStr err $> defaultTheme
+  either fallback return customizations
+
+selected :: AttrName -> AttrName
+selected = flip mappend "selected"
+
+styled :: Style -> Attr
+styled = withStyle defAttr
 
 type FitEvent = ()
 
@@ -41,33 +67,27 @@ initialState config mbCommand =
     cmd = Command $ fromMaybe "" mbCommand
 
 
-app :: App FitState FitEvent FitName
-app =
+app :: Theme -> App FitState FitEvent FitName
+app theme =
   App
   { appDraw = drawUi
   , appChooseCursor = neverShowCursor
   , appHandleEvent = handleEvent
   , appStartEvent = return
-  , appAttrMap = const attributes
+  , appAttrMap = const $ themeToAttrMap theme
   }
 
 drawUi :: FitState -> [Widget FitName]
 drawUi s = [ui s]
 
-attributes :: AttrMap
-attributes = A.attrMap V.defAttr
-    [ ( E.editAttr,                   fg white         )
-    , ( E.editFocusedAttr,            black `on` blue  )
-    , ( L.listAttr,                   fg white         )
-    , ( L.listSelectedAttr,           black `on` blue  )
-    ]
-
 ui :: FitState -> Widget FitName
 ui st =
   withBorderStyle S.unicode $
   B.borderWithLabel (txt "| Forget it! |") $
-    (str "Command: " <+> vLimit 1 (commandEditor st)) <=>
-    suggestionsList st
+    padLeftRight 1 $
+      (str "Command: " <+> vLimit 1 (commandEditor st))
+        <=> B.hBorder
+        <=> suggestionsList st
 
 commandEditor :: FitState -> Widget FitName
 commandEditor st = F.withFocusRing
@@ -81,12 +101,25 @@ suggestionsList st = F.withFocusRing
   (L.renderList renderSuggestion)
   (st ^. suggestions)
 
+suggestionAttr :: AttrName
+suggestionAttr = attrName "suggestion"
+
+suggestionNameAttr :: AttrName
+suggestionNameAttr = suggestionAttr <> "name"
+
+suggestionDescAttr :: AttrName
+suggestionDescAttr = suggestionAttr <> "desc"
+
 renderSuggestion :: Bool -> Suggestion -> Widget FitName
-renderSuggestion isActive (Suggestion s) =
-  C.hCenter $ item s
-  where
-    item = txt . bool identity active isActive
-    active i = "-> " <> i <> " <-"
+renderSuggestion isSelected (Suggestion (Name name) (Description desc)) =
+  suggestion  where
+    suggestion = withAttr suggA $ nameW <+> descW
+    nameW = padLeft (Pad 1) $ padRight Max $ hLimit 12 $ withAttr nameA $ txt name
+    descW = padRight (Pad 1) $ padLeft Max $ withAttr descA $ txt desc
+    suggA = withSelection suggestionAttr
+    nameA = withSelection suggestionNameAttr
+    descA = withSelection suggestionDescAttr
+    withSelection attr = bool attr (selected attr) isSelected
 
 handleEvent :: FitState -> BrickEvent FitName FitEvent -> EventM FitName (Next FitState)
 handleEvent st (VtyEvent ev) =

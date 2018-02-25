@@ -4,6 +4,8 @@
 module Fit.Model
   ( Command(..)
   , Suggestion(..)
+  , Name(..)
+  , Description(..)
   , suggestCommand
   ) where
 
@@ -13,19 +15,25 @@ import           Data.Text.Zipper.Generic
 import           Fit.Config
 import           Protolude
 
-newtype Command =
-  Command Text
+newtype Command = Command Text
   deriving (Eq, Show, Monoid, GenericTextZipper, TextWidth)
 
 instance Newtype Command Text where
   pack = Command
   unpack (Command t) = t
 
+newtype Name = Name Text
+  deriving (Eq, Show)
 
-newtype Suggestion =
-  Suggestion Text
+newtype Description = Description Text
+  deriving (Eq, Show)
+
+data Suggestion = Suggestion Name Description
   deriving (Eq, Show)
 
 suggestCommand :: FitConfig -> Command -> [Suggestion]
-suggestCommand (FitConfig commands) = const $ suggest <$> commands where
-  suggest (CommandConfig name desc) = Suggestion $ name <> " - " <> desc
+suggestCommand (FitConfig commands) _ =
+  suggest <$> commands
+  where
+    suggest (CommandConfig name desc) =
+      Suggestion (Name name) (Description desc)
