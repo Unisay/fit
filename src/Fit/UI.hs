@@ -13,7 +13,6 @@ import qualified Brick.Widgets.Border.Style as S
 import qualified Brick.Widgets.Edit         as E
 import qualified Brick.Widgets.List         as L
 import qualified Data.Text                  as T
-import qualified Data.Vector                as Vec
 import           Fit.Config
 import           Fit.Controller
 import           Fit.Event
@@ -59,19 +58,6 @@ selected = flip mappend "selected"
 styled :: Style -> Attr
 styled = withStyle defAttr
 
-initialState :: C.BChan FitEvent -> FitConfig -> Maybe Text -> FitState
-initialState chan config mbCommand =
-  FitState { _fitEvents = chan
-           , _focusRing = F.focusRing [SuggestionsList, CmdEdit]
-           , _commandLine = emptyCommandLine
-           , _commandEditor = E.editor CmdEdit Nothing cmd
-           , _suggestions = L.list SuggestionsList (Vec.fromList ss) 1
-           }
-  where
-    ss = suggestCommand config (Command cmd)
-    cmd = fromMaybe "" mbCommand
-
-
 app :: Theme -> App FitState FitEvent FitName
 app theme =
   App
@@ -96,15 +82,15 @@ ui st =
 
 commandEditorW :: FitState -> Widget FitName
 commandEditorW st = F.withFocusRing
-  (st ^. focusRing)
+  (st ^. focusRingL)
   (E.renderEditor (txt . T.unlines))
-  (st ^. commandEditor)
+  (st ^. commandEditorL)
 
 suggestionsList :: FitState -> Widget FitName
 suggestionsList st = F.withFocusRing
-  (st ^. focusRing)
+  (st ^. focusRingL)
   (L.renderList renderSuggestion)
-  (st ^. suggestions)
+  (st ^. suggestionsL)
 
 suggestionAttr :: AttrName
 suggestionAttr = attrName "suggestion"
@@ -115,12 +101,12 @@ suggestionNameAttr = suggestionAttr <> "name"
 suggestionDescAttr :: AttrName
 suggestionDescAttr = suggestionAttr <> "desc"
 
-renderSuggestion :: Named e => Bool -> Suggestion e -> Widget FitName
-renderSuggestion isSelected (Suggestion e (Description desc)) = suggestion
+renderSuggestion :: Bool -> Suggestion -> Widget FitName
+renderSuggestion isSelected sg = suggestion
   where
     suggestion = withAttr suggA $ nameW <+> descW
-    nameW = padLeft (Pad 1) $ padRight Max $ hLimit 12 $ withAttr nameA $ txt $ name e
-    descW = padRight (Pad 1) $ padLeft Max $ withAttr descA $ txt desc
+    nameW = padLeft (Pad 1) $ padRight Max $ hLimit 12 $ withAttr nameA $ txt $ name sg
+    descW = padRight (Pad 1) $ padLeft Max $ withAttr descA $ txt $ description sg
     suggA = withSelection suggestionAttr
     nameA = withSelection suggestionNameAttr
     descA = withSelection suggestionDescAttr
@@ -130,10 +116,10 @@ handleBrickEvent :: FitState -> BrickEvent FitName FitEvent -> EventM FitName (N
 handleBrickEvent st (VtyEvent ev) =
   case ev of
     V.EvKey V.KEsc [] -> halt st
-    V.EvKey (V.KChar '\t') [] -> continue $ st & focusRing %~ F.focusNext
-    V.EvKey V.KBackTab [] -> continue $ st & focusRing %~ F.focusPrev
-    _ -> continue =<< case F.focusGetCurrent (st^.focusRing) of
-           Just CmdEdit -> handleEventLensed st commandEditor E.handleEditorEvent ev
+    V.EvKey (V.KChar '\t') [] -> continue $ st & focusRingL %~ F.focusNext
+    V.EvKey V.KBackTab [] -> continue $ st & focusRingL %~ F.focusPrev
+    _ -> continue =<< case F.focusGetCurrent (st^.focusRingL) of
+           Just CmdEdit -> handleEventLensed st commandEditorL E.handleEditorEvent ev
            Just SuggestionsList -> handleSuggestionEvents st ev
            Nothing -> return st
 handleBrickEvent st (AppEvent ev) = continue $ handleAppEvent st ev
@@ -142,11 +128,11 @@ handleBrickEvent st _ = continue st
 
 handleSuggestionEvents :: FitState -> V.Event -> EventM FitName FitState
 handleSuggestionEvents st (V.EvKey V.KEnter []) = do
-  let selectedSuggestion = snd <$> L.listSelectedElement (st^.suggestions)
-      mbEvent = CommandSelected . suggested <$> selectedSuggestion
-      sendEvent = C.writeBChan (st^.fitEvents)
+  let selectedSuggestion = snd <$> L.listSelectedElement (st^.suggestionsL)
+      mbEvent = SuggestionSelected <$> selectedSuggestion
+      sendEvent = C.writeBChan (st^.fitEventsL)
       doNothing = return ()
   liftIO $ maybe doNothing sendEvent mbEvent
   return st
 handleSuggestionEvents st ev =
-  handleEventLensed st suggestions L.handleListEvent ev
+  handleEventLensed st suggestionsL L.handleListEvent ev

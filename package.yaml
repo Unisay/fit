@@ -28,6 +28,7 @@ library:
   exposed-modules:
   - Fit
   dependencies:
+  - template-haskell
   - brick
   - vty
   - microlens-platform

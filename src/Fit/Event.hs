@@ -2,8 +2,8 @@ module Fit.Event
   ( FitEvent(..)
   ) where
 
-import           Fit.Model (Command)
+import           Fit.Model
 import           Protolude
 
-newtype FitEvent = CommandSelected Command
+newtype FitEvent = SuggestionSelected Suggestion
   deriving (Eq, Show)
